@@ -36,6 +36,19 @@ function baseNumero(name) {
   return m ? m[1] : null;
 }
 
+// ---------------------------------------------------------------
+// A qué "tipo" de contenido corresponde cada extensión: cambia qué
+// controles tiene sentido mostrar (editor de texto vs. imagen,
+// ejecutar vs. vista previa markdown vs. nada).
+// ---------------------------------------------------------------
+const IMAGE_EXTS = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg']);
+function kindForExt(ext) {
+  if (ext === 'js') return 'code';
+  if (ext === 'md') return 'markdown';
+  if (IMAGE_EXTS.has(ext)) return 'image';
+  return 'text';
+}
+
 function sortTasks() {
   state.tasks.sort((a, b) => parseInt(a.numero, 10) - parseInt(b.numero, 10));
 }
@@ -57,19 +70,22 @@ async function loadCreatorMode() {
   const manifest = await res.json();
   const tasks = [];
   for (const t of manifest.tareas) {
+    const ext = extFromFilename(t.codigo);
+    const isImg = IMAGE_EXTS.has(ext);
     const [mdRaw, codeRaw] = await Promise.all([
       fetch(`data/${t.md}`).then(r => r.text()),
-      fetch(`data/${t.codigo}`).then(r => r.text()).catch(() => ''),
+      isImg ? Promise.resolve('') : fetch(`data/${t.codigo}`).then(r => r.text()).catch(() => ''),
     ]);
     const parsed = MD.parse(mdRaw);
     tasks.push({
       numero: t.numero,
       mdName: t.md,
       codeName: t.codigo,
-      ext: extFromFilename(t.codigo),
+      ext,
       meta: parsed.meta,
       sections: parsed.sections,
       codeText: codeRaw,
+      codeBlob: null, // se completa al vuelo la primera vez que se ve una imagen
       readonly: true,
     });
   }
@@ -246,6 +262,22 @@ async function renderCodePanel(task) {
   panel.classList.remove('hidden');
   el('resizer-main').classList.remove('hidden');
   el('code-filename').textContent = task.codeName;
+  state.dirty = false;
+
+  el('btn-download-code').classList.toggle('hidden', state.mode !== 'creator');
+
+  const kind = kindForExt(task.ext);
+  if (kind === 'image') {
+    await renderImagePanel(task);
+  } else {
+    await renderTextPanel(task, kind);
+  }
+}
+
+async function renderTextPanel(task, kind) {
+  el('code-split').classList.remove('hidden');
+  el('pane-image').classList.add('hidden');
+  el('btn-pick-image').classList.add('hidden');
 
   let text = task.codeText;
   if (state.mode === 'own') {
@@ -255,20 +287,153 @@ async function renderCodePanel(task) {
   const editor = el('code-editor');
   editor.value = text || '';
   editor.readOnly = state.mode === 'creator';
-  state.dirty = false;
-
-  const isJs = task.ext === 'js';
-  el('btn-run').disabled = !isJs;
+  editor.classList.remove('hidden');
+  el('btn-save-code').classList.remove('hidden');
   el('btn-save-code').disabled = state.mode === 'creator';
-  el('btn-download-code').classList.toggle('hidden', state.mode !== 'creator');
-  el('run-output').innerHTML = `<div class="line hint">${isJs ? 'La salida de console.log() aparecerá aquí al ejecutar.' : 'Este tipo de archivo no se ejecuta en la página. Usa “Abrir en VS Code”.'}</div>`;
 
-  // el toggle código/ambos/ejecución solo tiene sentido cuando el archivo es ejecutable
-  ['code', 'both', 'run'].forEach(v => {
-    el('view-toggle').querySelector(`[data-view="${v}"]`).disabled = !isJs && v !== 'code';
-  });
-  setViewMode(isJs ? state.viewMode : 'code');
+  const isJs = kind === 'code';
+  const isMd = kind === 'markdown';
+  const hasChrome = isJs || isMd; // ¿tiene sentido el toggle de vista aquí?
+
+  el('btn-run').classList.toggle('hidden', !isJs);
+  el('view-toggle').classList.toggle('hidden', !hasChrome);
+  el('md-toolbar').classList.toggle('hidden', !isMd);
+
+  if (isMd) {
+    el('view-btn-code').textContent = 'Editar';
+    el('view-btn-run').textContent = 'Vista previa';
+  } else {
+    el('view-btn-code').textContent = 'Código';
+    el('view-btn-run').textContent = 'Ejecución';
+  }
+
+  el('run-output').classList.toggle('hidden', !isJs);
+  el('md-preview').classList.toggle('hidden', !isMd);
+  if (isJs) {
+    el('run-output').innerHTML = '<div class="line hint">La salida de console.log() aparecerá aquí al ejecutar.</div>';
+  } else if (isMd) {
+    updateMdPreview(editor.value);
+  }
+
+  setViewMode(hasChrome ? state.viewMode : 'code');
 }
+
+// ---------------------------------------------------------------
+// Vista previa en vivo para archivos .md (mismo renderizador que el
+// panel de la izquierda, para que "Vista previa" se vea igual de bonito).
+// ---------------------------------------------------------------
+function updateMdPreview(text) {
+  const html = MD.renderSection(text || '');
+  el('md-preview').innerHTML = html || '<p class="md-preview-empty">Escribe algo a la izquierda para ver la vista previa…</p>';
+}
+
+function wrapSelection(before, after, placeholder) {
+  const ta = el('code-editor');
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const selected = ta.value.slice(start, end) || placeholder;
+  ta.value = ta.value.slice(0, start) + before + selected + after + ta.value.slice(end);
+  const cursorStart = start + before.length;
+  ta.focus();
+  ta.setSelectionRange(cursorStart, cursorStart + selected.length);
+  ta.dispatchEvent(new Event('input'));
+}
+
+function prefixLines(prefix) {
+  const ta = el('code-editor');
+  const start = ta.selectionStart, end = ta.selectionEnd;
+  const value = ta.value;
+  const lineStart = value.lastIndexOf('\n', start - 1) + 1;
+  let lineEnd = value.indexOf('\n', end);
+  if (lineEnd === -1) lineEnd = value.length;
+  const block = value.slice(lineStart, lineEnd);
+  const newBlock = block.length ? block.split('\n').map(l => prefix + l).join('\n') : prefix;
+  ta.value = value.slice(0, lineStart) + newBlock + value.slice(lineEnd);
+  ta.focus();
+  ta.setSelectionRange(lineStart, lineStart + newBlock.length);
+  ta.dispatchEvent(new Event('input'));
+}
+
+el('md-toolbar').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-md]');
+  if (!btn || el('code-editor').readOnly) return;
+  switch (btn.dataset.md) {
+    case 'bold': wrapSelection('**', '**', 'texto en negrita'); break;
+    case 'italic': wrapSelection('*', '*', 'texto en cursiva'); break;
+    case 'h2': prefixLines('## '); break;
+    case 'ul': prefixLines('- '); break;
+    case 'ol': prefixLines('1. '); break;
+    case 'quote': prefixLines('> '); break;
+    case 'code': wrapSelection('`', '`', 'código'); break;
+    case 'link': wrapSelection('[', '](https://)', 'texto del enlace'); break;
+  }
+});
+
+// ---------------------------------------------------------------
+// Panel de imagen (.png/.jpg/.gif/.webp/.svg): sin editor de texto,
+// solo una vista previa y (en modo "own") un botón para reemplazar
+// el archivo por una foto elegida del computador.
+// ---------------------------------------------------------------
+async function renderImagePanel(task) {
+  el('code-split').classList.add('hidden');
+  el('pane-image').classList.remove('hidden');
+  el('btn-run').classList.add('hidden');
+  el('view-toggle').classList.add('hidden');
+  el('md-toolbar').classList.add('hidden');
+  el('btn-save-code').classList.add('hidden');
+
+  const img = el('image-preview');
+  const placeholder = el('image-placeholder');
+  if (img.dataset.blobUrl) URL.revokeObjectURL(img.dataset.blobUrl);
+  img.removeAttribute('src');
+  img.classList.add('hidden');
+  placeholder.classList.remove('hidden');
+
+  let blob = null;
+  try {
+    if (state.mode === 'own') {
+      blob = await task.codeHandle.getFile();
+    } else {
+      if (!task.codeBlob) {
+        const res = await fetch(`data/${task.codeName}`);
+        if (res.ok) task.codeBlob = await res.blob();
+      }
+      blob = task.codeBlob;
+    }
+  } catch (e) { /* sin archivo todavía o no se pudo leer */ }
+
+  if (blob && blob.size > 0) {
+    const url = URL.createObjectURL(blob);
+    img.src = url;
+    img.dataset.blobUrl = url;
+    img.classList.remove('hidden');
+    placeholder.classList.add('hidden');
+  } else {
+    placeholder.textContent = state.mode === 'own'
+      ? 'Todavía no hay foto — usa “Seleccionar foto” para subir una.'
+      : 'Esta tarea no tiene una imagen todavía.';
+  }
+
+  el('btn-pick-image').classList.toggle('hidden', state.mode !== 'own');
+}
+
+el('btn-pick-image').addEventListener('click', () => {
+  if (state.mode !== 'own' || !state.current) return;
+  el('f-image-input').click();
+});
+
+el('f-image-input').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file || !state.current || state.mode !== 'own') return;
+  try {
+    await FS.writeBinary(state.dirHandle, state.current.codeName, file);
+    toast('Foto reemplazada ✓');
+    await renderImagePanel(state.current);
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo guardar la foto.');
+  }
+});
 
 function setViewMode(mode) {
   state.viewMode = mode;
@@ -279,7 +444,7 @@ function setViewMode(mode) {
     btn.classList.toggle('active', btn.dataset.view === mode);
   });
   el('resizer-code').classList.toggle('hidden', mode !== 'both');
-  if (mode === 'run' && state.current && state.current.ext === 'js') {
+  if (mode === 'run' && state.current && kindForExt(state.current.ext) === 'code') {
     runJs(el('code-editor').value);
   }
 }
@@ -293,6 +458,9 @@ el('view-toggle').addEventListener('click', (e) => {
 el('code-editor').addEventListener('input', () => {
   state.dirty = true;
   el('btn-save-code').disabled = state.mode !== 'own';
+  if (state.current && kindForExt(state.current.ext) === 'markdown') {
+    updateMdPreview(el('code-editor').value);
+  }
 });
 
 // ---------------------------------------------------------------
@@ -300,6 +468,7 @@ el('code-editor').addEventListener('input', () => {
 // ---------------------------------------------------------------
 function startPolling() {
   if (state.mode !== 'own' || !state.current || !state.current.codeHandle) return;
+  if (kindForExt(state.current.ext) === 'image') return; // no tiene sentido comparar bytes de imagen como texto
   state.pollTimer = setInterval(async () => {
     if (state.dirty) return; // no pisar cambios locales sin guardar
     try {
@@ -307,6 +476,7 @@ function startPolling() {
       if (fresh !== el('code-editor').value) {
         el('code-editor').value = fresh;
         state.current.codeText = fresh;
+        if (kindForExt(state.current.ext) === 'markdown') updateMdPreview(fresh);
         toast('Archivo actualizado desde el disco');
       }
     } catch (e) { /* silencioso */ }
@@ -321,7 +491,7 @@ function stopPolling() {
 // Guardar código editado
 // ---------------------------------------------------------------
 el('btn-save-code').addEventListener('click', async () => {
-  if (state.mode !== 'own' || !state.current) return;
+  if (state.mode !== 'own' || !state.current || kindForExt(state.current.ext) === 'image') return;
   await FS.writeText(state.dirHandle, state.current.codeName, el('code-editor').value);
   state.current.codeText = el('code-editor').value;
   state.dirty = false;
@@ -385,7 +555,7 @@ function runJs(code) {
 }
 
 el('btn-run').addEventListener('click', () => {
-  if (!state.current || state.current.ext !== 'js') return;
+  if (!state.current || kindForExt(state.current.ext) !== 'code') return;
   runJs(el('code-editor').value);
 });
 
@@ -438,9 +608,16 @@ el('btn-confirm-vscode-path').addEventListener('click', () => {
 // donde no hay carpeta local real: hay que descargarlo antes de poder
 // abrirlo en un editor de tu computador).
 // ---------------------------------------------------------------
-el('btn-download-code').addEventListener('click', () => {
+el('btn-download-code').addEventListener('click', async () => {
   if (!state.current || !state.current.codeName) return;
-  const blob = new Blob([el('code-editor').value], { type: 'text/plain' });
+  const isImg = kindForExt(state.current.ext) === 'image';
+  let blob;
+  if (isImg) {
+    blob = state.current.codeBlob;
+    if (!blob) { toast('Todavía no se pudo leer la imagen.'); return; }
+  } else {
+    blob = new Blob([el('code-editor').value], { type: 'text/plain' });
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -495,6 +672,8 @@ el('btn-confirm-new-task').addEventListener('click', async () => {
 
   const starter = ext === 'js'
     ? `// Ejercicio ${numero} · ${titulo}\n// Escribe tu código debajo de esta línea\n\n`
+    : ext === 'md'
+    ? `# ${titulo}\n\n`
     : '';
 
   await FS.writeText(state.dirHandle, mdName, mdContent);
@@ -563,6 +742,8 @@ async function importTasksFromList(items) {
 
     const starter = item.extension === 'js'
       ? `// Ejercicio ${numero} · ${item.titulo}\n// Escribe tu código debajo de esta línea\n\n`
+      : item.extension === 'md'
+      ? `# ${item.titulo}\n\n`
       : '';
 
     await FS.writeText(state.dirHandle, mdName, mdContent);
@@ -609,7 +790,7 @@ Responde SIGUIENDO EXACTAMENTE este formato, sin saludo, sin texto antes o despu
 
 titulo: <título corto y claro del ejercicio>
 palabra_clave: <una o varias palabras clave separadas por coma, para identificarlo en una lista>
-extension: <extensión del archivo que debo crear para resolver este ejercicio: js, py, html, txt, png, etc. — elige la que tenga sentido según el tema>
+extension: <extensión del archivo que debo crear para resolver este ejercicio: js, py, html, txt, md, png, etc. — usa "md" si el ejercicio es más de redactar/tomar notas/resumir teoría, "png" si es de subir una foto (dibujo, manualidad, plato de cocina...), o la que tenga sentido según el tema>
 
 ## Descripción
 <qué tengo que lograr en este ejercicio, en 2-4 líneas, SIN resolverlo>

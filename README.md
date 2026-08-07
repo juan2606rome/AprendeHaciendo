@@ -41,7 +41,7 @@ Después de eso, "Probar tú mismo" funciona en Brave exactamente igual que en C
 Botón **+ Nueva tarea** (modo "Probar tú mismo"):
 
 1. Escribe el título, una palabra clave (o varias, separadas por comas — es lo que se ve en la lista de la izquierda), la descripción del reto y, si aplica, teoría.
-2. Elige qué archivo se genera para resolverlo (`.js` se puede ejecutar dentro de la misma página; los demás se abren en tu editor de preferencia).
+2. Elige qué archivo se genera para resolverlo — `.js` se puede ejecutar dentro de la misma página, `.md` trae un editor con vista previa bonita (viñetas, negritas, etc.), `.png`/`.jpg`/`.gif`/`.webp`/`.svg` se resuelven subiendo una foto, y cualquier otra extensión se edita como texto plano o se abre en tu editor de preferencia.
 3. Al confirmar, se crean `NNN-slug.md` y `NNN-slug.ext` en tu carpeta, numerados en orden.
 
 ## Pedirle ideas de ejercicios a una IA (opcional)
@@ -53,7 +53,7 @@ El prompt le pide a la IA que responda en bloques con este formato, separados po
 ```
 titulo: <título corto>
 palabra_clave: <una o varias, separadas por coma>
-extension: <js, py, png, txt, etc. — según el tema>
+extension: <js, py, html, txt, md, png, etc. — según el tema>
 
 ## Descripción
 <qué hay que lograr, sin resolverlo>
@@ -62,7 +62,9 @@ extension: <js, py, png, txt, etc. — según el tema>
 <opcional>
 ```
 
-Como el formato no exige código, sirve para cualquier disciplina: para dibujo o cocina, por ejemplo, la IA puede sugerir `extension: png` o `txt` y describir la tarea en vez de código.
+Como el formato no exige código, sirve para cualquier disciplina: para dibujo o cocina, por ejemplo, la IA puede sugerir `extension: png` (subes una foto del resultado) o `extension: md` (para redactar o resumir teoría, con vista previa bonita) en vez de código.
+
+El importador es tolerante con texto "mal pegado" desde un chat (saltos de línea reacomodados, encabezados sin `##`, el separador `===` pegado a la línea siguiente): igual detecta cada ejercicio correctamente.
 
 ## Importar muchos ejercicios de una vez
 
@@ -80,7 +82,11 @@ Para archivos `.js`, el botón **▶ Ejecutar** corre el código en un `<iframe>
 - **Ambos** — editor y salida lado a lado.
 - **Ejecución** — solo la salida, a pantalla completa.
 
-Para archivos que no son `.js`, solo aplica la vista "Código" (no hay nada que ejecutar; se usa "Abrir en VS Code"). El editor de la página es de texto plano, así que no sirve para editar archivos binarios como `.png` — esos se crean vacíos y se reemplazan manualmente arrastrando el archivo real a la carpeta.
+Para archivos `.md` aparece el mismo selector de vista (renombrado a **Editar / Ambos / Vista previa**), más una pequeña barra con negrita, cursiva, encabezado, viñetas, lista numerada, cita, código en línea y enlace — la vista previa se renderiza igual de bonito que el enunciado de la izquierda.
+
+Para archivos de imagen (`.png`, `.jpg`, `.gif`, `.webp`, `.svg`) no hay editor de texto ni selector de vista: se ve la foto tal cual, y en modo "Probar tú mismo" aparece un botón **📷 Seleccionar foto** que reemplaza el archivo en tu carpeta con la foto que elijas de tu computador (se guarda con el mismo nombre que ya tenía).
+
+Para el resto de extensiones (`.py`, `.html`, `.css`, `.txt`, etc.) solo aparece el editor de texto plano, sin selector de vista ni botón de ejecutar, ya que no aplican.
 
 Tanto el ancho entre el enunciado y el editor, como el ancho entre el editor y la salida, se pueden arrastrar y quedan guardados entre visitas.
 

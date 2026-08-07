@@ -98,10 +98,19 @@ const FS = (() => {
     return fileHandle;
   }
 
+  /** Igual que writeText pero para contenido binario (fotos, etc.): acepta un File/Blob. */
+  async function writeBinary(dirHandle, filename, blob) {
+    const fileHandle = await dirHandle.getFileHandle(filename, { create: true });
+    const writable = await fileHandle.createWritable();
+    await writable.write(blob);
+    await writable.close();
+    return fileHandle;
+  }
+
   return {
     saveHandle, loadHandle, clearHandle,
     verifyPermission, pickDirectory,
-    listFiles, readText, writeText,
+    listFiles, readText, writeText, writeBinary,
     isSupported, isBrave,
   };
 })();

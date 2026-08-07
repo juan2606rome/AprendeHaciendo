@@ -74,15 +74,27 @@
         <span class="filename" id="code-filename">—</span>
         <span class="spacer"></span>
         <div class="view-toggle" id="view-toggle">
-          <button class="view-btn" data-view="code" title="Solo código">Código</button>
-          <button class="view-btn" data-view="both" title="Código y ejecución">Ambos</button>
-          <button class="view-btn" data-view="run" title="Solo ejecución">Ejecución</button>
+          <button class="view-btn" id="view-btn-code" data-view="code" title="Solo edición">Código</button>
+          <button class="view-btn" data-view="both" title="Edición y vista previa">Ambos</button>
+          <button class="view-btn" id="view-btn-run" data-view="run" title="Solo vista previa / ejecución">Ejecución</button>
         </div>
         <button class="code-btn" id="btn-refresh-code" title="Releer el archivo del disco">↻ Releer</button>
         <button class="code-btn" id="btn-save-code" disabled>💾 Guardar</button>
         <button class="code-btn hidden" id="btn-download-code" title="Descargar este archivo a tu computador">⬇ Descargar</button>
+        <button class="code-btn hidden" id="btn-pick-image" title="Elegir una foto de tu computador">📷 Seleccionar foto</button>
+        <input type="file" id="f-image-input" accept="image/*" class="hidden">
         <button class="code-btn" id="btn-open-vscode">↗ Abrir en VS Code</button>
-        <button class="code-btn run" id="btn-run">▶ Ejecutar</button>
+        <button class="code-btn run hidden" id="btn-run">▶ Ejecutar</button>
+      </div>
+      <div class="md-toolbar hidden" id="md-toolbar">
+        <button type="button" data-md="bold" title="Negrita"><b>B</b></button>
+        <button type="button" data-md="italic" title="Cursiva"><i>I</i></button>
+        <button type="button" data-md="h2" title="Encabezado">H</button>
+        <button type="button" data-md="ul" title="Lista con viñetas">• Lista</button>
+        <button type="button" data-md="ol" title="Lista numerada">1. Lista</button>
+        <button type="button" data-md="quote" title="Cita">" Cita</button>
+        <button type="button" data-md="code" title="Código en línea">&lt;/&gt;</button>
+        <button type="button" data-md="link" title="Enlace">🔗 Enlace</button>
       </div>
       <div id="code-split">
         <div id="pane-editor">
@@ -91,7 +103,12 @@
         <div id="resizer-code" class="resizer resizer-v hidden" title="Arrastra para ajustar el ancho"></div>
         <div id="pane-output">
           <div id="run-output"><div class="line hint">La salida de console.log() aparecerá aquí al ejecutar.</div></div>
+          <div id="md-preview" class="hidden"></div>
         </div>
+      </div>
+      <div id="pane-image" class="hidden">
+        <img id="image-preview" alt="" class="hidden">
+        <div id="image-placeholder" class="hint">Sin foto todavía.</div>
       </div>
     </section>
   </main>
@@ -123,6 +140,8 @@
       <label for="f-ext">Archivo a generar</label>
       <select id="f-ext">
         <option value="js">.js — JavaScript (se puede ejecutar aquí)</option>
+        <option value="md">.md — Markdown (editor con vista previa bonita, sin ejecutar)</option>
+        <option value="png">.png — foto/imagen (subes una foto, sin editor de texto)</option>
         <option value="py">.py — Python</option>
         <option value="html">.html — HTML</option>
         <option value="css">.css — CSS</option>
@@ -130,7 +149,7 @@
         <option value="other">Otra extensión…</option>
       </select>
       <input type="text" id="f-ext-custom" class="hidden" placeholder="Escribe la extensión, ej. java" style="margin-top:8px;">
-      <div class="hint">Solo los archivos <code class="mono">.js</code> se pueden ejecutar dentro de la página. Los demás se abren con “Abrir en VS Code”.</div>
+      <div class="hint">Solo <code class="mono">.js</code> se ejecuta dentro de la página. <code class="mono">.md</code> trae editor con vista previa. <code class="mono">.png</code> (o .jpg/.gif/.webp/.svg) se sube como foto. Los demás se editan como texto plano o se abren con “Abrir en VS Code”.</div>
     </div>
 
     <div class="modal-actions">
