@@ -100,63 +100,82 @@ const MD = (() => {
    * titulo: siguiente ejercicio
    * ...
    *
-   * Es tolerante con espacios extra y con bloques que no traigan
-   * "## Teoría". Ignora bloques sin "titulo".
+   * Es tolerante con espacios extra, con bloques que no traigan
+   * "Teoría", con encabezados sin "##" (pasa seguido al copiar la
+   * respuesta ya renderizada de un chat en vez del markdown crudo), y
+   * con "===" pegado a la línea siguiente por el reajuste de saltos de
+   * línea que hacen algunos editores/chats al copiar texto largo.
+   * Ignora bloques sin "titulo".
    */
+  function normalizeHeadingLine(line) {
+    return line.replace(/^#+\s*/, '').trim().toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/:\s*$/, '');
+  }
+
+  const IMPORT_SECTION_HEADINGS = new Set(['descripcion', 'teoria']);
+  const IMPORT_KEY_ALTERNATION = '(?:titulo|palabra[ _]clave|extension|ext|archivo)\\s*:';
+
+  function extractHeaderField(flatHeader, key) {
+    const re = new RegExp(key + '\\s*:\\s*(.*?)\\s*(?=' + IMPORT_KEY_ALTERNATION + '|$)', 'i');
+    const m = flatHeader.match(re);
+    return m ? m[1].trim() : '';
+  }
+
   function parseImportFile(raw) {
     if (!raw || !raw.trim()) return [];
 
-    const blocks = raw
-      .split(/\n[ \t]*={3,}[ \t]*\n/)
+    // El separador "===" a veces no queda solo en su propia línea (p. ej.
+    // "=== titulo: ..." pegado en una sola línea). Sin importar cómo haya
+    // quedado el espacio/salto alrededor, lo normalizamos siempre a una
+    // línea propia antes de partir en bloques.
+    const normalized = raw.replace(/[ \t\n]*={3,}[ \t\n]*/g, '\n===\n');
+
+    const blocks = normalized
+      .split(/\n===\n/)
       .map(b => b.trim())
       .filter(Boolean);
 
     const items = [];
     for (const block of blocks) {
-      // separa "cabecera" (líneas clave: valor) del cuerpo (secciones ##)
-      const headerLines = [];
-      const bodyLines = [];
-      let inHeader = true;
       const lines = block.split('\n');
-      for (const line of lines) {
-        if (inHeader) {
-          if (/^\s*$/.test(line)) { inHeader = false; continue; }
-          if (/^##\s/.test(line)) { inHeader = false; bodyLines.push(line); continue; }
-          headerLines.push(line);
-        } else {
-          bodyLines.push(line);
-        }
-      }
 
-      const meta = {};
-      headerLines.forEach(line => {
-        const idx = line.indexOf(':');
-        if (idx === -1) return;
-        const key = line.slice(0, idx).trim().toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, ''); // sin tildes
-        const value = line.slice(idx + 1).trim();
-        if (key) meta[key] = value;
+      // ubica las líneas de encabezado de sección (Descripción / Teoría),
+      // con o sin "##" delante — así toleramos texto pegado desde una
+      // vista ya renderizada, donde el "##" se pierde.
+      const headings = [];
+      lines.forEach((line, i) => {
+        const norm = normalizeHeadingLine(line);
+        if (IMPORT_SECTION_HEADINGS.has(norm)) headings.push({ i, name: norm });
       });
 
-      const body = bodyLines.join('\n');
+      const headerLines = lines.slice(0, headings.length ? headings[0].i : lines.length);
+      // el bloque "cabecera" se aplana a una sola línea: así da igual si
+      // "titulo:", "palabra_clave:" y "extension:" quedaron cada uno en su
+      // propia línea o todos revueltos en el mismo párrafo por un reajuste
+      // de saltos de línea — cada valor se extrae hasta la siguiente clave
+      // conocida, sin importar dónde caigan los saltos de línea reales.
+      const flatHeader = headerLines.join(' ').replace(/\s+/g, ' ').trim();
+
       const sections = {};
-      body.split(/\n(?=##\s)/).forEach(part => {
-        const hm = part.match(/^##\s*(.+)\n?/);
-        if (!hm) return;
-        const heading = hm[1].trim().toLowerCase()
-          .normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-        sections[heading] = part.slice(hm[0].length).trim();
+      headings.forEach((h, idx) => {
+        const end = idx + 1 < headings.length ? headings[idx + 1].i : lines.length;
+        sections[h.name] = lines.slice(h.i + 1, end).join('\n').trim();
       });
 
-      const titulo = (meta.titulo || '').trim();
+      const titulo = extractHeaderField(flatHeader, 'titulo');
       if (!titulo) continue; // bloque inválido, se ignora
 
-      let extension = (meta.extension || meta.ext || meta.archivo || 'js').trim();
+      const palabra_clave = extractHeaderField(flatHeader, 'palabra[ _]clave');
+      let extension = extractHeaderField(flatHeader, 'extension')
+        || extractHeaderField(flatHeader, 'ext')
+        || extractHeaderField(flatHeader, 'archivo')
+        || 'js';
       extension = extension.replace(/^\./, '').split(/[\s,]/)[0].toLowerCase() || 'js';
 
       items.push({
         titulo,
-        palabra_clave: meta.palabra_clave || meta['palabra clave'] || '',
+        palabra_clave,
         extension,
         descripcion: sections['descripcion'] || '',
         teoria: sections['teoria'] || '',
