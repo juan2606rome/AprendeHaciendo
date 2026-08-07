@@ -8,9 +8,18 @@
  */
 
 const FS = (() => {
-  const DB_NAME = 'aprende-haciendo-fs';
+  const DB_NAME = 'aprendeHaciendo-fs';
   const STORE = 'handles';
   const KEY = 'data-dir';
+
+  function isSupported() {
+    return typeof window.showDirectoryPicker === 'function';
+  }
+
+  /** Detección oficial de Brave (no es 100% infalible, pero es la recomendada por Brave mismo). */
+  async function isBrave() {
+    return !!(navigator.brave && (await navigator.brave.isBrave()));
+  }
 
   function openDb() {
     return new Promise((resolve, reject) => {
@@ -93,5 +102,6 @@ const FS = (() => {
     saveHandle, loadHandle, clearHandle,
     verifyPermission, pickDirectory,
     listFiles, readText, writeText,
+    isSupported, isBrave,
   };
 })();

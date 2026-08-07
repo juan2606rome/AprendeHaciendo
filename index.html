@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aprende Haciendo · aprende programando, no leyendo</title>
+<title>aprendeHaciendo · aprende programando, no leyendo</title>
 <link rel="stylesheet" href="css/style.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
 </head>
@@ -11,7 +11,7 @@
 
 <!-- ============ LANDING ============ -->
 <section id="landing">
-  <span class="landing-mark">Aprende Haciendo</span>
+  <span class="landing-mark">aprendeHaciendo</span>
   <h1>Aprende programando,<br>no leyendo.</h1>
   <p class="lead">Cada ejercicio es un ticket con dos mitades: a la izquierda el enunciado (lo mínimo necesario para entender qué hacer), a la derecha el código, para escribir y ejecutar de una vez.</p>
 
@@ -37,28 +37,34 @@
 <div id="app" class="hidden">
   <aside id="sidebar">
     <div class="sidebar-header">
-      <div class="brand">aprende-haciendo</div>
-      <div class="mode-tag" id="mode-tag">—</div>
+      <button id="btn-toggle-sidebar" class="sidebar-collapse-btn" title="Colapsar/expandir la lista">⟨⟩</button>
+      <div class="sidebar-header-text">
+        <div class="brand">aprendeHaciendo</div>
+        <div class="mode-tag" id="mode-tag">—</div>
+      </div>
     </div>
     <div class="sidebar-actions hidden" id="sidebar-actions">
-      <button id="btn-new-task">+ Nueva tarea</button>
-      <button id="btn-import-tasks" class="secondary">⇪ Importar tareas</button>
+      <button id="btn-new-task" title="Nueva tarea"><span class="icon">+</span><span class="label"> Nueva tarea</span></button>
+      <button id="btn-import-tasks" class="secondary" title="Importar tareas"><span class="icon">⇪</span><span class="label"> Importar tareas</span></button>
     </div>
     <div id="task-list"></div>
     <div class="sidebar-footer">
-      <button class="ghost-btn" id="btn-prompt-guide-app">Generar prompt para IA</button>
-      <button class="ghost-btn" id="btn-change-folder">Cambiar carpeta</button>
-      <button class="ghost-btn" id="btn-back-landing">← Volver al inicio</button>
+      <button class="ghost-btn" id="btn-prompt-guide-app" title="Generar prompt para IA"><span class="icon">✦</span><span class="label"> Generar prompt para IA</span></button>
+      <button class="ghost-btn" id="btn-change-folder" title="Cambiar carpeta"><span class="icon">📁</span><span class="label"> Cambiar carpeta</span></button>
+      <button class="ghost-btn" id="btn-back-landing" title="Volver al inicio"><span class="icon">←</span><span class="label"> Volver al inicio</span></button>
     </div>
   </aside>
 
   <main id="main">
     <section id="panel-read">
-      <div class="empty-state" id="empty-state">
-        <h2>Nada seleccionado todavía</h2>
-        <p>Elige una tarea de la lista o crea la primera con <strong>+ Nueva tarea</strong>.</p>
+      <div class="stub hidden" id="stub-badge"><div class="stub-chip" id="stub-chip-text">Nº —</div></div>
+      <div class="panel-read-scroll">
+        <div class="empty-state" id="empty-state">
+          <h2>Nada seleccionado todavía</h2>
+          <p>Elige una tarea de la lista o crea la primera con <strong>+ Nueva tarea</strong>.</p>
+        </div>
+        <div id="read-content" class="hidden"></div>
       </div>
-      <div id="read-content" class="hidden"></div>
     </section>
 
     <div id="resizer-main" class="resizer resizer-v hidden" title="Arrastra para ajustar el ancho"></div>
@@ -74,6 +80,7 @@
         </div>
         <button class="code-btn" id="btn-refresh-code" title="Releer el archivo del disco">↻ Releer</button>
         <button class="code-btn" id="btn-save-code" disabled>💾 Guardar</button>
+        <button class="code-btn hidden" id="btn-download-code" title="Descargar este archivo a tu computador">⬇ Descargar</button>
         <button class="code-btn" id="btn-open-vscode">↗ Abrir en VS Code</button>
         <button class="code-btn run" id="btn-run">▶ Ejecutar</button>
       </div>
@@ -136,15 +143,40 @@
 <!-- ============ MODAL: ruta local (para abrir en VS Code) ============ -->
 <div class="modal-overlay hidden" id="modal-vscode-path">
   <div class="modal">
-    <h3>Ruta local de tu carpeta <span class="mono">data</span></h3>
-    <p class="sub">Los navegadores no revelan la ruta real de una carpeta por seguridad, así que este es el único dato manual que te voy a pedir. Se guarda solo en este navegador.</p>
+    <h3 id="vscode-path-title">¿En qué carpeta de tu computador está ese archivo?</h3>
+    <p class="sub" id="vscode-path-sub">Aunque ya seleccionaste la carpeta arriba, por seguridad ningún navegador (ni Chrome, ni Brave, ni ninguno) le permite a una página saber la ruta real de una carpeta en tu disco — solo te deja leer y escribir dentro de ella. Por eso este es el único dato que te voy a pedir escrito, y solo una vez: se guarda en este navegador y no te lo vuelvo a preguntar.</p>
     <div class="field">
-      <label for="f-basepath">Ruta absoluta a la carpeta data</label>
+      <label for="f-basepath">Ruta absoluta a la carpeta</label>
       <input type="text" id="f-basepath" placeholder="Ej. /home/tu-usuario/mi-repo/data o C:\Users\tu-usuario\mi-repo\data">
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="btn-cancel-vscode-path">Cancelar</button>
       <button class="btn-primary" id="btn-confirm-vscode-path">Guardar y abrir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: navegador sin soporte (Brave y similares) ============ -->
+<div class="modal-overlay hidden" id="modal-fsa-help">
+  <div class="modal">
+    <h3>Tu navegador tiene esto apagado por defecto</h3>
+    <p class="sub" id="fsa-help-text">Para poder leer y escribir carpetas de tu computador, esta página usa la File System Access API del navegador. Chrome y Edge la traen encendida, pero Brave la trae apagada por defecto (por privacidad) y hay que encenderla a mano — una sola vez.</p>
+    <div class="field">
+      <label>Pasos en Brave</label>
+      <ol class="fsa-steps">
+        <li>Abre una pestaña nueva y ve a <code class="mono" id="fsa-flag-url">brave://flags/#file-system-access-api</code> <button class="btn-copy-inline" id="btn-copy-flag-url" title="Copiar">Copiar</button></li>
+        <li>Busca <strong>“File System Access API”</strong> y cambia el selector de <em>Default</em> a <strong>Enabled</strong>.</li>
+        <li>Brave te va a pedir reiniciar (botón <strong>Relaunch</strong>) — dale clic.</li>
+        <li>Vuelve a esta página y elige <strong>Probar tú mismo</strong> otra vez.</li>
+      </ol>
+      <div class="hint">Los enlaces <span class="mono">brave://</span> no se pueden abrir con un clic por seguridad del navegador, por eso hay que copiar y pegar la dirección tú mismo en una pestaña nueva.</div>
+    </div>
+    <div class="field">
+      <label>Alternativa, sin tocar nada del navegador</label>
+      <div class="hint">Abre esta misma página en Chrome o Edge — ahí la File System Access API viene activada por defecto y no hace falta ningún paso extra.</div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-primary" id="btn-close-fsa-help">Entendido</button>
     </div>
   </div>
 </div>

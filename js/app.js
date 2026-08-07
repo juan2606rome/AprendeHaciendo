@@ -1,5 +1,5 @@
 /**
- * app.js — lógica principal de Aprende Haciendo.
+ * app.js — lógica principal de aprendeHaciendo.
  * No usa ningún framework ni IA: solo DOM + File System Access API.
  */
 
@@ -207,6 +207,7 @@ function showEmptyState() {
   el('empty-state').classList.remove('hidden');
   el('read-content').classList.add('hidden');
   el('panel-code').classList.add('hidden');
+  el('stub-badge').classList.add('hidden');
 }
 
 function renderReadPanel(task) {
@@ -220,8 +221,10 @@ function renderReadPanel(task) {
   const descHtml = MD.renderSection(task.sections['descripción'] || task.sections['descripcion'] || '');
   const teoriaHtml = MD.renderSection(task.sections['teoría'] || task.sections['teoria'] || '');
 
+  el('stub-badge').classList.remove('hidden');
+  el('stub-chip-text').textContent = `Nº ${task.numero}`;
+
   box.innerHTML = `
-    <div class="stub"><div class="stub-chip">Nº ${task.numero}</div></div>
     <div class="read-eyebrow">Tarea ${task.numero}</div>
     <h2 class="read-title">${task.meta.titulo || '(sin título)'}</h2>
     ${keywords.length ? `<div class="keyword-row">${keywords.map(k => `<span class="keyword-chip">${k}</span>`).join('')}</div>` : ''}
@@ -257,6 +260,7 @@ async function renderCodePanel(task) {
   const isJs = task.ext === 'js';
   el('btn-run').disabled = !isJs;
   el('btn-save-code').disabled = state.mode === 'creator';
+  el('btn-download-code').classList.toggle('hidden', state.mode !== 'creator');
   el('run-output').innerHTML = `<div class="line hint">${isJs ? 'La salida de console.log() aparecerá aquí al ejecutar.' : 'Este tipo de archivo no se ejecuta en la página. Usa “Abrir en VS Code”.'}</div>`;
 
   // el toggle código/ambos/ejecución solo tiene sentido cuando el archivo es ejecutable
@@ -342,7 +346,7 @@ function runJs(code) {
   iframe.sandbox = 'allow-scripts';
   iframe.style.display = 'none';
   iframe.srcdoc = `<!DOCTYPE html><html><body><script>
-    const send = (type, args) => parent.postMessage({ __jsquest:true, type, args }, '*');
+    const send = (type, args) => parent.postMessage({ __aprendeHaciendo:true, type, args }, '*');
     ['log','error','warn','info'].forEach(m => {
       console[m] = (...args) => send(m, args.map(a => {
         try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }
@@ -350,7 +354,7 @@ function runJs(code) {
       }));
     });
     window.addEventListener('message', (ev) => {
-      if (!ev.data || ev.data.__jsquestRun !== true) return;
+      if (!ev.data || ev.data.__aprendeHaciendoRun !== true) return;
       try {
         new Function(ev.data.code)();
       } catch(e) {
@@ -361,7 +365,7 @@ function runJs(code) {
   <\/script></body></html>`;
 
   const onMessage = (ev) => {
-    if (!ev.data || !ev.data.__jsquest) return;
+    if (!ev.data || !ev.data.__aprendeHaciendo) return;
     if (ev.data.type === '__done') {
       window.removeEventListener('message', onMessage);
       setTimeout(() => iframe.remove(), 50);
@@ -376,7 +380,7 @@ function runJs(code) {
 
   document.body.appendChild(iframe);
   iframe.addEventListener('load', () => {
-    iframe.contentWindow.postMessage({ __jsquestRun: true, code }, '*');
+    iframe.contentWindow.postMessage({ __aprendeHaciendoRun: true, code }, '*');
   });
 }
 
@@ -388,10 +392,24 @@ el('btn-run').addEventListener('click', () => {
 // ---------------------------------------------------------------
 // Abrir en VS Code (requiere ruta base guardada una sola vez)
 // ---------------------------------------------------------------
+function vscodeBasepathKey() {
+  // en modo lectura el archivo no vive en tu carpeta de datos sino en donde
+  // lo descargues, así que se guarda por separado y no se mezcla con la ruta
+  // de tu carpeta "own".
+  return state.mode === 'creator' ? 'aprendeHaciendo-basepath-downloads' : 'aprendeHaciendo-basepath';
+}
+
 el('btn-open-vscode').addEventListener('click', () => {
   if (!state.current || !state.current.codeName) return;
-  const basePath = localStorage.getItem('jsquest-basepath');
+  const basePath = localStorage.getItem(vscodeBasepathKey());
   if (!basePath) {
+    if (state.mode === 'creator') {
+      el('vscode-path-title').textContent = '¿Dónde guardaste el archivo descargado?';
+      el('vscode-path-sub').textContent = 'Estás en modo lectura, así que primero descarga el archivo con "⬇ Descargar" (si no lo has hecho). Después dime en qué carpeta quedó guardado — normalmente tu carpeta de Descargas — y no te lo vuelvo a preguntar en este navegador.';
+    } else {
+      el('vscode-path-title').textContent = '¿En qué carpeta de tu computador está esta tarea?';
+      el('vscode-path-sub').textContent = 'Aunque ya seleccionaste la carpeta arriba, por seguridad ningún navegador le permite a una página saber la ruta real de una carpeta en tu disco — solo te deja leer y escribir dentro de ella. Por eso este es el único dato que te voy a pedir escrito, y solo una vez.';
+    }
     el('modal-vscode-path').classList.remove('hidden');
     return;
   }
@@ -410,9 +428,28 @@ el('btn-cancel-vscode-path').addEventListener('click', () => {
 el('btn-confirm-vscode-path').addEventListener('click', () => {
   const val = el('f-basepath').value.trim();
   if (!val) return;
-  localStorage.setItem('jsquest-basepath', val);
+  localStorage.setItem(vscodeBasepathKey(), val);
   el('modal-vscode-path').classList.add('hidden');
   if (state.current) openInVsCode(val, state.current.codeName);
+});
+
+// ---------------------------------------------------------------
+// Descargar el archivo de código (modo "Ver ejercicios del creador",
+// donde no hay carpeta local real: hay que descargarlo antes de poder
+// abrirlo en un editor de tu computador).
+// ---------------------------------------------------------------
+el('btn-download-code').addEventListener('click', () => {
+  if (!state.current || !state.current.codeName) return;
+  const blob = new Blob([el('code-editor').value], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = state.current.codeName;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast('Descargado ✓ — normalmente cae en tu carpeta de Descargas');
 });
 
 // ---------------------------------------------------------------
@@ -656,7 +693,19 @@ el('btn-mode-creator').addEventListener('click', async () => {
 
 let resumableHandle = null;
 
+async function showFsaHelp() {
+  const brave = await FS.isBrave().catch(() => false);
+  el('fsa-help-text').textContent = brave
+    ? 'Detecté que estás en Brave: trae esta función apagada por defecto (por privacidad) y hay que encenderla a mano, una sola vez, con los pasos de abajo.'
+    : 'Para poder leer y escribir carpetas de tu computador, esta página usa la File System Access API del navegador. Chrome y Edge la traen encendida por defecto; en Firefox y Safari no existe todavía. Si estás en Brave, tráela apagada por defecto — enciéndela con los pasos de abajo.';
+  el('modal-fsa-help').classList.remove('hidden');
+}
+
 el('btn-mode-own').addEventListener('click', async () => {
+  if (!FS.isSupported()) {
+    await showFsaHelp();
+    return;
+  }
   try {
     if (resumableHandle) {
       const granted = await FS.verifyPermission(resumableHandle, 'readwrite');
@@ -674,12 +723,30 @@ el('btn-mode-own').addEventListener('click', async () => {
     await loadOwnMode(handle);
   } catch (e) {
     if (e.message === 'NO_SUPPORT') {
-      toast('Tu navegador no soporta esta función. Usa Chrome o Edge.');
+      await showFsaHelp();
     } else if (e.name !== 'AbortError') {
       toast('No se pudo abrir la carpeta.');
       console.error(e);
     }
   }
+});
+
+el('btn-close-fsa-help').addEventListener('click', () => {
+  el('modal-fsa-help').classList.add('hidden');
+});
+el('btn-copy-flag-url').addEventListener('click', async () => {
+  const text = el('fsa-flag-url').textContent;
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const range = document.createRange();
+    range.selectNode(el('fsa-flag-url'));
+    window.getSelection().removeAllRanges();
+    window.getSelection().addRange(range);
+    document.execCommand('copy');
+    window.getSelection().removeAllRanges();
+  }
+  toast('Copiado ✓');
 });
 
 el('btn-change-folder').addEventListener('click', async () => {
@@ -726,8 +793,23 @@ function makeResizable(resizer, leftPanel, container, storageKey, { min = 220, m
   resizer.addEventListener('pointercancel', stop);
 }
 
-makeResizable(el('resizer-main'), el('panel-read'), el('main'), 'jsquest-w-main', { min: 260, max: 760 });
-makeResizable(el('resizer-code'), el('pane-editor'), el('code-split'), 'jsquest-w-code', { min: 180, max: 1400 });
+makeResizable(el('resizer-main'), el('panel-read'), el('main'), 'aprendeHaciendo-w-main', { min: 260, max: 760 });
+makeResizable(el('resizer-code'), el('pane-editor'), el('code-split'), 'aprendeHaciendo-w-code', { min: 180, max: 1400 });
+
+// ---------------------------------------------------------------
+// Colapsar/expandir la barra lateral: en colapsado solo se ven los
+// números de cada tarea. Queda guardado entre visitas.
+// ---------------------------------------------------------------
+function setSidebarCollapsed(collapsed) {
+  el('sidebar').classList.toggle('collapsed', collapsed);
+  localStorage.setItem('aprendeHaciendo-sidebar-collapsed', collapsed ? '1' : '0');
+}
+el('btn-toggle-sidebar').addEventListener('click', () => {
+  setSidebarCollapsed(!el('sidebar').classList.contains('collapsed'));
+});
+if (localStorage.getItem('aprendeHaciendo-sidebar-collapsed') === '1') {
+  setSidebarCollapsed(true);
+}
 
 // ---------------------------------------------------------------
 // Al cargar: si hay una carpeta guardada de una sesión anterior,

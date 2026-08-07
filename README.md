@@ -1,4 +1,4 @@
-# Aprende_Haciendo
+# aprendeHaciendo
 
 Una página simple para aprender **haciendo, no leyendo**: creas un reto, lo resuelves y sigues con el siguiente. Nació pensada para practicar programación, pero cada tarea puede asociarse a cualquier tipo de archivo (código, texto, imagen...), así que sirve igual para llevar el seguimiento de dibujo, cocina, idiomas o cualquier otra cosa que quieras practicar con retos concretos.
 
@@ -26,7 +26,15 @@ La página tiene **dos modos**, elegibles desde la pantalla de inicio:
 
 ## Requisitos: navegadores soportados
 
-La File System Access API solo existe en navegadores basados en Chromium: **Chrome, Edge, Opera, Brave**. En Firefox o Safari el modo "Probar tú mismo" no está disponible (el modo "Ver ejercicios del creador" sí funciona en cualquier navegador, porque solo usa `fetch`).
+La File System Access API (lo que permite el modo "Probar tú mismo") solo existe en navegadores basados en Chromium. En **Chrome, Edge y Opera** viene activada por defecto. En **Firefox y Safari** no existe todavía, así que ese modo no está disponible ahí (el modo "Ver ejercicios del creador" sí funciona en cualquier navegador, porque solo usa `fetch`).
+
+**Brave** también está basada en Chromium, pero trae esta función **apagada por defecto** (por privacidad) — hay que encenderla a mano, una sola vez:
+
+1. Ve a `brave://flags/#file-system-access-api`.
+2. Cambia el selector de *Default* a **Enabled**.
+3. Reinicia Brave cuando te lo pida (botón *Relaunch*).
+
+Después de eso, "Probar tú mismo" funciona en Brave exactamente igual que en Chrome (lectura y escritura reales en tu carpeta, sin subir nada a ningún lado). La página también te muestra estos pasos automáticamente si detecta que tu navegador no soporta la función.
 
 ## Crear una tarea nueva
 
@@ -62,7 +70,9 @@ Botón **⇪ Importar tareas** (junto a "+ Nueva tarea"). Pega ahí el archivo c
 
 ## Editar y ejecutar código
 
-El botón **↗ Abrir en VS Code** abre el archivo exacto en tu editor (la primera vez pide la ruta absoluta de tu carpeta, porque el navegador no la expone por seguridad). Si guardas desde ahí con la tarea abierta, la página relee el archivo del disco cada par de segundos y actualiza sola.
+El botón **↗ Abrir en VS Code** abre el archivo exacto en tu editor (la primera vez pide la ruta absoluta de tu carpeta, porque el navegador no la expone por seguridad — ni siquiera después de que ya elegiste esa carpeta con el selector nativo). Si guardas desde ahí con la tarea abierta, la página relee el archivo del disco cada par de segundos y actualiza sola.
+
+En modo "Ver ejercicios del creador" no hay ninguna carpeta local seleccionada (el código se trae por `fetch` desde el sitio publicado), así que ahí aparece primero un botón **⬇ Descargar** para bajar el archivo a tu computador — después "Abrir en VS Code" te pide dónde quedó guardado (normalmente tu carpeta de Descargas) y lo recuerda para la próxima vez.
 
 Para archivos `.js`, el botón **▶ Ejecutar** corre el código en un `<iframe>` aislado y muestra la salida de `console.log`. Hay un selector de vista:
 
