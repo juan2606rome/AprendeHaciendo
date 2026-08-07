@@ -693,6 +693,11 @@ el('btn-mode-creator').addEventListener('click', async () => {
 
 let resumableHandle = null;
 
+function markResumable(handle) {
+  resumableHandle = handle;
+  el('btn-mode-own').textContent = 'Reanudar mi carpeta';
+}
+
 async function showFsaHelp() {
   const brave = await FS.isBrave().catch(() => false);
   el('fsa-help-text').textContent = brave
@@ -718,6 +723,7 @@ el('btn-mode-own').addEventListener('click', async () => {
       toast('Permiso no concedido. Elige la carpeta de nuevo.');
     }
     const handle = await FS.pickDirectory();
+    markResumable(handle);
     showApp();
     showEmptyState();
     await loadOwnMode(handle);
@@ -752,6 +758,7 @@ el('btn-copy-flag-url').addEventListener('click', async () => {
 el('btn-change-folder').addEventListener('click', async () => {
   try {
     const handle = await FS.pickDirectory();
+    markResumable(handle);
     showEmptyState();
     await loadOwnMode(handle);
   } catch (e) {
@@ -819,9 +826,6 @@ if (localStorage.getItem('aprendeHaciendo-sidebar-collapsed') === '1') {
 window.addEventListener('DOMContentLoaded', async () => {
   try {
     const saved = await FS.loadHandle();
-    if (saved) {
-      resumableHandle = saved;
-      el('btn-mode-own').textContent = 'Reanudar mi carpeta';
-    }
+    if (saved) markResumable(saved);
   } catch (e) { /* IndexedDB no disponible o vacío: no pasa nada */ }
 });
