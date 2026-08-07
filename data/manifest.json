@@ -1,0 +1,7 @@
+{
+  "descripcion": "Manifiesto usado SOLO en el modo 'Ver ejercicios del creador' (lectura via fetch, sin File System Access API). En el modo 'Probar tú mismo' este archivo se ignora: la carpeta se lee directamente del disco.",
+  "tareas": [
+    { "numero": "001", "md": "001-hola-mundo.md", "codigo": "001-hola-mundo.js" },
+    { "numero": "002", "md": "002-variables-y-tipos.md", "codigo": "002-variables-y-tipos.js" }
+  ]
+}

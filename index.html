@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aprende Haciendo · aprende programando, no leyendo</title>
+<link rel="stylesheet" href="css/style.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+</head>
+<body>
+
+<!-- ============ LANDING ============ -->
+<section id="landing">
+  <span class="landing-mark">Aprende Haciendo</span>
+  <h1>Aprende programando,<br>no leyendo.</h1>
+  <p class="lead">Cada ejercicio es un ticket con dos mitades: a la izquierda el enunciado (lo mínimo necesario para entender qué hacer), a la derecha el código, para escribir y ejecutar de una vez.</p>
+
+  <div class="mode-cards">
+    <div class="mode-card">
+      <div class="num">MODO 01</div>
+      <h3>Ver ejercicios del creador</h3>
+      <p>Explora, en solo lectura, los ejercicios que ya se hicieron en este repositorio. No necesitas seleccionar ninguna carpeta.</p>
+      <button id="btn-mode-creator">Ver ejercicios</button>
+    </div>
+    <div class="mode-card secondary">
+      <div class="num">MODO 02</div>
+      <h3>Probar tú mismo</h3>
+      <p>Selecciona tu propia carpeta <code class="mono">data/</code> en tu computador. Crea tus propios retos, escribe código y ejecútalo aquí mismo.</p>
+      <button id="btn-mode-own">Elegir mi carpeta</button>
+    </div>
+  </div>
+
+  <button class="link-btn" id="btn-prompt-guide-landing">¿No sabes qué ejercicios pedir? Genera un prompt para una IA →</button>
+</section>
+
+<!-- ============ APP ============ -->
+<div id="app" class="hidden">
+  <aside id="sidebar">
+    <div class="sidebar-header">
+      <div class="brand">aprende-haciendo</div>
+      <div class="mode-tag" id="mode-tag">—</div>
+    </div>
+    <div class="sidebar-actions hidden" id="sidebar-actions">
+      <button id="btn-new-task">+ Nueva tarea</button>
+      <button id="btn-import-tasks" class="secondary">⇪ Importar tareas</button>
+    </div>
+    <div id="task-list"></div>
+    <div class="sidebar-footer">
+      <button class="ghost-btn" id="btn-prompt-guide-app">Generar prompt para IA</button>
+      <button class="ghost-btn" id="btn-change-folder">Cambiar carpeta</button>
+      <button class="ghost-btn" id="btn-back-landing">← Volver al inicio</button>
+    </div>
+  </aside>
+
+  <main id="main">
+    <section id="panel-read">
+      <div class="empty-state" id="empty-state">
+        <h2>Nada seleccionado todavía</h2>
+        <p>Elige una tarea de la lista o crea la primera con <strong>+ Nueva tarea</strong>.</p>
+      </div>
+      <div id="read-content" class="hidden"></div>
+    </section>
+
+    <div id="resizer-main" class="resizer resizer-v hidden" title="Arrastra para ajustar el ancho"></div>
+
+    <section id="panel-code" class="hidden">
+      <div class="code-toolbar">
+        <span class="filename" id="code-filename">—</span>
+        <span class="spacer"></span>
+        <div class="view-toggle" id="view-toggle">
+          <button class="view-btn" data-view="code" title="Solo código">Código</button>
+          <button class="view-btn" data-view="both" title="Código y ejecución">Ambos</button>
+          <button class="view-btn" data-view="run" title="Solo ejecución">Ejecución</button>
+        </div>
+        <button class="code-btn" id="btn-refresh-code" title="Releer el archivo del disco">↻ Releer</button>
+        <button class="code-btn" id="btn-save-code" disabled>💾 Guardar</button>
+        <button class="code-btn" id="btn-open-vscode">↗ Abrir en VS Code</button>
+        <button class="code-btn run" id="btn-run">▶ Ejecutar</button>
+      </div>
+      <div id="code-split">
+        <div id="pane-editor">
+          <textarea id="code-editor" spellcheck="false" placeholder="// el código de la tarea aparecerá aquí"></textarea>
+        </div>
+        <div id="resizer-code" class="resizer resizer-v hidden" title="Arrastra para ajustar el ancho"></div>
+        <div id="pane-output">
+          <div id="run-output"><div class="line hint">La salida de console.log() aparecerá aquí al ejecutar.</div></div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- ============ MODAL: nueva tarea ============ -->
+<div class="modal-overlay hidden" id="modal-new-task">
+  <div class="modal">
+    <h3>Nueva tarea</h3>
+    <p class="sub">Se crearán dos archivos en tu carpeta <code class="mono">data/</code>: un <code class="mono">.md</code> con el enunciado y un archivo de código vacío.</p>
+
+    <div class="field">
+      <label for="f-titulo">Título</label>
+      <input type="text" id="f-titulo" placeholder="Ej. Recorrer un arreglo con reduce">
+    </div>
+    <div class="field">
+      <label for="f-keyword">Palabra clave (para la lista desplegable)</label>
+      <input type="text" id="f-keyword" placeholder="Ej. arrays, reduce, closures">
+    </div>
+    <div class="field">
+      <label for="f-desc">Descripción</label>
+      <textarea id="f-desc" placeholder="¿Qué tienes que lograr en este ejercicio?"></textarea>
+    </div>
+    <div class="field">
+      <label for="f-teoria">Teoría (opcional)</label>
+      <textarea id="f-teoria" placeholder="Notas o contexto, si aplica. Puedes dejarlo en blanco."></textarea>
+    </div>
+    <div class="field">
+      <label for="f-ext">Archivo a generar</label>
+      <select id="f-ext">
+        <option value="js">.js — JavaScript (se puede ejecutar aquí)</option>
+        <option value="py">.py — Python</option>
+        <option value="html">.html — HTML</option>
+        <option value="css">.css — CSS</option>
+        <option value="txt">.txt — texto plano</option>
+        <option value="other">Otra extensión…</option>
+      </select>
+      <input type="text" id="f-ext-custom" class="hidden" placeholder="Escribe la extensión, ej. java" style="margin-top:8px;">
+      <div class="hint">Solo los archivos <code class="mono">.js</code> se pueden ejecutar dentro de la página. Los demás se abren con “Abrir en VS Code”.</div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btn-cancel-new-task">Cancelar</button>
+      <button class="btn-primary" id="btn-confirm-new-task">Crear tarea</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: ruta local (para abrir en VS Code) ============ -->
+<div class="modal-overlay hidden" id="modal-vscode-path">
+  <div class="modal">
+    <h3>Ruta local de tu carpeta <span class="mono">data</span></h3>
+    <p class="sub">Los navegadores no revelan la ruta real de una carpeta por seguridad, así que este es el único dato manual que te voy a pedir. Se guarda solo en este navegador.</p>
+    <div class="field">
+      <label for="f-basepath">Ruta absoluta a la carpeta data</label>
+      <input type="text" id="f-basepath" placeholder="Ej. /home/tu-usuario/mi-repo/data o C:\Users\tu-usuario\mi-repo\data">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btn-cancel-vscode-path">Cancelar</button>
+      <button class="btn-primary" id="btn-confirm-vscode-path">Guardar y abrir</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: importar tareas en lote ============ -->
+<div class="modal-overlay hidden" id="modal-import-tasks">
+  <div class="modal modal-wide">
+    <h3>Importar tareas</h3>
+    <p class="sub">Pega aquí el archivo que te devolvió la IA (o cárgalo desde tu computador). Se crean todos los ejercicios de una sola vez, numerados a partir del siguiente número disponible en tu carpeta.</p>
+
+    <div class="field">
+      <label for="f-import-file">Cargar archivo (.md o .txt)</label>
+      <input type="file" id="f-import-file" accept=".md,.txt,text/markdown,text/plain">
+    </div>
+    <div class="field">
+      <label for="f-import-text">O pega el contenido aquí</label>
+      <textarea id="f-import-text" class="mono" placeholder="titulo: ...&#10;palabra_clave: ...&#10;extension: js&#10;&#10;## Descripción&#10;...&#10;&#10;## Teoría&#10;...&#10;&#10;===&#10;&#10;titulo: siguiente ejercicio&#10;..."></textarea>
+    </div>
+    <div class="hint" id="import-preview">Aún no hay nada para importar.</div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btn-cancel-import">Cancelar</button>
+      <button class="btn-primary" id="btn-confirm-import" disabled>Importar tareas</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ MODAL: guía / generador de prompt para IA ============ -->
+<div class="modal-overlay hidden" id="modal-prompt-guide">
+  <div class="modal modal-wide">
+    <h3>Generar prompt para pedirle ejercicios a una IA</h3>
+    <p class="sub">Esto no usa inteligencia artificial dentro de la página — solo arma el texto que tú copias y pegas en la IA que prefieras (ChatGPT, Claude, la que sea). Lo que te devuelva lo pegas directo en "Importar tareas". Sirve para cualquier tema: programación, dibujo, cocina, idiomas, lo que sea.</p>
+
+    <div class="field">
+      <label for="f-prompt-tema">Tema que quieres practicar</label>
+      <input type="text" id="f-prompt-tema" placeholder="Ej. JavaScript desde cero, dibujo con acuarelas, cocina italiana básica">
+    </div>
+    <div class="field">
+      <label for="f-prompt-n">Cantidad de ejercicios</label>
+      <input type="number" id="f-prompt-n" value="30" min="1" max="200">
+    </div>
+    <div class="field">
+      <label for="prompt-output">Prompt listo para copiar</label>
+      <textarea id="prompt-output" class="mono" readonly></textarea>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-cancel" id="btn-close-prompt-guide">Cerrar</button>
+      <button class="btn-primary" id="btn-copy-prompt">Copiar prompt</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="js/fs.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
