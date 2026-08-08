@@ -107,10 +107,19 @@ const FS = (() => {
     return fileHandle;
   }
 
+  /** Borra un archivo de la carpeta. Si ya no existe, no falla. */
+  async function removeFile(dirHandle, filename) {
+    try {
+      await dirHandle.removeEntry(filename);
+    } catch (e) {
+      if (e.name !== 'NotFoundError') throw e;
+    }
+  }
+
   return {
     saveHandle, loadHandle, clearHandle,
     verifyPermission, pickDirectory,
-    listFiles, readText, writeText, writeBinary,
+    listFiles, readText, writeText, writeBinary, removeFile,
     isSupported, isBrave,
   };
 })();

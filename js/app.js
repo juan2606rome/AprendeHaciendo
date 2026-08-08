@@ -36,6 +36,17 @@ function baseNumero(name) {
   return m ? m[1] : null;
 }
 
+// El enunciado de una tarea siempre es "NNN-slug.md". Si el ejercicio en sí
+// se resuelve en markdown (extensión "md"), el archivo de respuesta NO puede
+// llamarse igual (se pisarían entre sí) — se distingue con ".respuesta.md".
+function isDescriptionMd(name) {
+  const lower = name.toLowerCase();
+  return lower.endsWith('.md') && !lower.endsWith('.respuesta.md');
+}
+function answerFilename(base, ext) {
+  return ext === 'md' ? `${base}.respuesta.md` : `${base}.${ext}`;
+}
+
 // ---------------------------------------------------------------
 // A qué "tipo" de contenido corresponde cada extensión: cambia qué
 // controles tiene sentido mostrar (editor de texto vs. imagen,
@@ -115,7 +126,7 @@ async function refreshTaskListFromDisk() {
     const numero = baseNumero(name);
     if (!numero) return; // ignora archivos que no siguen la convención NNN-...
     groups[numero] = groups[numero] || {};
-    if (name.toLowerCase().endsWith('.md')) {
+    if (isDescriptionMd(name)) {
       groups[numero].mdName = name;
       groups[numero].mdHandle = handle;
     } else if (name !== 'manifest.json') {
@@ -249,6 +260,10 @@ function renderReadPanel(task) {
       <div class="content">${descHtml || '<p><em>Sin descripción.</em></p>'}</div>
     </div>
     ${teoriaHtml ? `<div class="read-section"><h4>Teoría</h4><div class="content">${teoriaHtml}</div></div>` : ''}
+    ${state.mode === 'own' ? `
+    <div class="delete-task-row">
+      <button class="btn-danger-ghost" id="btn-delete-task">🗑 Eliminar tarea</button>
+    </div>` : ''}
   `;
 }
 
@@ -664,7 +679,7 @@ el('btn-confirm-new-task').addEventListener('click', async () => {
   const slug = MD.slugify(titulo);
   const base = `${numero}-${slug}`;
   const mdName = `${base}.md`;
-  const codeName = `${base}.${ext}`;
+  const codeName = answerFilename(base, ext);
 
   const meta = { titulo, palabra_clave: keyword || '(sin palabra clave)', archivo: codeName };
   let mdContent = MD.buildFrontMatter(meta) + '\n## Descripción\n' + (desc || '_Pendiente por escribir._') + '\n';
@@ -708,6 +723,43 @@ function updateImportPreview() {
   btn.disabled = false;
 }
 
+// ---------------------------------------------------------------
+// Eliminar tarea (botón al fondo del enunciado, solo en modo "own")
+// ---------------------------------------------------------------
+el('read-content').addEventListener('click', (e) => {
+  if (!e.target.closest('#btn-delete-task') || !state.current) return;
+  const t = state.current;
+  el('delete-task-text').textContent =
+    `Se van a borrar los archivos de la tarea Nº ${t.numero} — “${t.meta.titulo || '(sin título)'}” — de tu carpeta. Esta acción no se puede deshacer.`;
+  el('modal-delete-task').classList.remove('hidden');
+});
+el('btn-cancel-delete-task').addEventListener('click', () => {
+  el('modal-delete-task').classList.add('hidden');
+});
+el('btn-confirm-delete-task').addEventListener('click', async () => {
+  if (state.mode !== 'own' || !state.current || !state.dirHandle) return;
+  const t = state.current;
+  el('btn-confirm-delete-task').disabled = true;
+  el('btn-confirm-delete-task').textContent = 'Eliminando…';
+  try {
+    stopPolling();
+    await FS.removeFile(state.dirHandle, t.mdName);
+    if (t.codeName) await FS.removeFile(state.dirHandle, t.codeName);
+    state.current = null;
+    state.dirty = false;
+    el('modal-delete-task').classList.add('hidden');
+    showEmptyState();
+    await refreshTaskListFromDisk();
+    toast('Tarea eliminada ✓');
+  } catch (e) {
+    console.error(e);
+    toast('No se pudo eliminar la tarea.');
+  } finally {
+    el('btn-confirm-delete-task').disabled = false;
+    el('btn-confirm-delete-task').textContent = 'Sí, eliminar';
+  }
+});
+
 el('btn-import-tasks').addEventListener('click', () => {
   el('f-import-file').value = '';
   el('f-import-text').value = '';
@@ -734,7 +786,7 @@ async function importTasksFromList(items) {
     const slug = MD.slugify(item.titulo);
     const base = `${numero}-${slug}`;
     const mdName = `${base}.md`;
-    const codeName = `${base}.${item.extension || 'js'}`;
+    const codeName = answerFilename(base, item.extension || 'js');
 
     const meta = { titulo: item.titulo, palabra_clave: item.palabra_clave || '(sin palabra clave)', archivo: codeName };
     let mdContent = MD.buildFrontMatter(meta) + '\n## Descripción\n' + (item.descripcion || '_Pendiente por escribir._') + '\n';
